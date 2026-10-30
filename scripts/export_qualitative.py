@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import torch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,6 +21,38 @@ from dmce.runner import device_for, seed_all
 PALETTE = np.array([[0, 0, 0], [64, 0, 128], [64, 64, 0], [0, 128, 192], [0, 0, 192],
                     [128, 128, 0], [64, 64, 128], [192, 128, 128], [192, 64, 0]], dtype=np.uint8)
 CLASSES = ['unlabelled', 'car', 'person', 'bike', 'curve', 'car stop', 'guardrail', 'color cone', 'bump']
+TITLES = {'dmce': 'DMCE (CSI)', 'without_dmce': 'Without DMCE', 'y_denoising': 'Y-oriented',
+          'x_denoising': 'X-oriented (extension)', 'mfnet_channel': 'MFNet with channel'}
+
+
+def comparison_grid(name, panels, snr):
+    width = 320
+    source_width, source_height = panels[0][1].size
+    height = round(source_height * width / source_width)
+    columns, gap, heading, caption = min(4, len(panels)), 10, 44, 34
+    rows = (len(panels) + columns - 1) // columns
+    canvas_width = columns * (width + gap) + gap
+    legend_rows = (len(CLASSES) + columns * 2 - 1) // (columns * 2)
+    canvas_height = heading + rows * (height + caption + gap) + legend_rows * 28 + gap
+    canvas = Image.new('RGB', (canvas_width, canvas_height), 'white')
+    drawing = ImageDraw.Draw(canvas)
+    font = ImageFont.load_default(size=20)
+    legend_font = ImageFont.load_default(size=16)
+    drawing.text((gap, 10), f'{name} | SNR {snr:g} dB', fill='black', font=font)
+    for index, (title, picture) in enumerate(panels):
+        x = gap + (index % columns) * (width + gap)
+        y = heading + (index // columns) * (height + caption + gap)
+        resampling = Image.Resampling.BILINEAR if title in ('RGB', 'IR') else Image.Resampling.NEAREST
+        canvas.paste(picture.resize((width, height), resampling), (x, y + caption))
+        drawing.text((x, y + 4), TITLES.get(title, title), fill='black', font=font)
+    legend_y = heading + rows * (height + caption + gap)
+    cell_width = (canvas_width - 2 * gap) // (columns * 2)
+    for index, (title, colour) in enumerate(zip(CLASSES, PALETTE)):
+        x = gap + index % (columns * 2) * cell_width
+        y = legend_y + index // (columns * 2) * 28
+        drawing.rectangle((x, y + 3, x + 15, y + 18), fill=tuple(map(int, colour)))
+        drawing.text((x + 21, y + 2), title, fill='black', font=legend_font)
+    return canvas
 
 
 def main():
@@ -84,15 +116,10 @@ def main():
         if device.type == 'cuda':
             torch.cuda.empty_cache()
     for name, columns in panels.items():
-        width, height = columns[0][1].size
-        canvas = Image.new('RGB', (width * len(columns), height + 32), 'white')
-        drawing = ImageDraw.Draw(canvas)
-        for index, (title, picture) in enumerate(columns):
-            canvas.paste(picture, (index * width, 32))
-            drawing.text((index * width + 8, 8), title, fill='black')
-        canvas.save(args.output_dir / f'{name}_comparison.png')
+        comparison_grid(name, columns, args.snr).save(args.output_dir / f'{name}_comparison.png')
     metadata = {'snr_db': args.snr, 'selection': 'first N entries of official test_day/test_night, without cherry-picking',
-                'samples': expected_samples, 'experiments': records, 'classes': CLASSES, 'palette': PALETTE.tolist()}
+                'samples': expected_samples, 'experiments': records, 'classes': CLASSES, 'palette': PALETTE.tolist(),
+                'display': 'four-column grid, 320px panels; nearest-neighbor label display; native predictions saved separately'}
     (args.output_dir / 'manifest.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(f'Exported {len(panels)} comparisons to {args.output_dir}')
 

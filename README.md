@@ -124,7 +124,7 @@ Run this under tmux or another durable process manager. On a shared server, pass
 
 Resume an interrupted suite with the same paths/configuration and `--resume`. The scheduler checks atomic checkpoints before deciding which stages need further training. Do not launch a second controller for the same output directory.
 
-The optional post-processing controller can wait alongside training and then audit checkpoints, export figures, and benchmark on an idle GPU. Use the same GPU lock template as training on shared servers:
+The optional post-processing controller can wait alongside training and then audit checkpoints, export figures, benchmark on an idle GPU, and write bilingual result reports. It checks that metric tables, qualitative images, and timing measurements refer to the same checkpoints. Use the same GPU lock template as training on shared servers:
 
 ```bash
 python scripts/finish_suite.py --suite-dir runs/paper_seed42 \
@@ -154,9 +154,14 @@ python scripts/export_qualitative.py --run-dir runs/paper_seed42/runs \
 python scripts/benchmark_inference.py --run-dir runs/paper_seed42/runs \
   --data-dir datasets/ir_seg_dataset --output results/paper_seed42/latency.json \
   --device cuda:0 --batch-size 1 --warmup 2 --repeats 10
+
+# Generate English/Chinese reports from the measured artifacts and checkpoint hashes
+python scripts/write_results_summary.py --results-dir results/paper_seed42
 ```
 
 The main `miou` averages all nine classes with a fixed denominator; absent classes contribute zero. `miou_foreground` reports the eight foreground classes separately. Both use the full confusion matrix, including false positives on background. JSON/CSV values are fractions in [0,1]; plots show percentages. CSI NMSE is total squared error divided by total true channel power, then converted to dB. The evaluation seed resets at each SNR.
+
+All/day/night are evaluated in separate passes, so their channel draws and batch-average noise power can differ. The day/night confusion matrices should not be summed to reconstruct the all-test matrix. Result reporting rejects short/custom runs by default; `--allow-bounded` is for debugging and labels both reports prominently.
 
 Latency excludes data loading and checkpoint loading and includes the encoder, channel, denoiser, and decoder. Report batch size and UNet evaluations alongside time: the SNR-dependent start index means `T=1000` does not imply 1,000 model calls at every SNR.
 

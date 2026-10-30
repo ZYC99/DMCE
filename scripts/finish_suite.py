@@ -25,6 +25,7 @@ def main():
     parser.add_argument('--gpus', type=int, nargs='+', required=True)
     parser.add_argument('--gpu-lock-template', default='/tmp/dmce-gpu{gpu}.lock')
     parser.add_argument('--wait', action='store_true')
+    parser.add_argument('--allow-bounded', action='store_true', help='Label custom/short runs as bounded in the final reports')
     args = parser.parse_args()
     if not args.gpus or min(args.gpus) < 0 or '{gpu}' not in args.gpu_lock_template:
         parser.error('Invalid GPU indices or lock template')
@@ -94,6 +95,10 @@ def main():
             run('latency', [ROOT / 'scripts/benchmark_inference.py', *common, '--output', output / 'latency.json'], selected_gpu, lock)
         finally:
             lock.close()
+        summary = [ROOT / 'scripts/write_results_summary.py', '--results-dir', output]
+        if args.allow_bounded:
+            summary.append('--allow-bounded')
+        run('summary', summary)
         record.update(status='completed', finished_at=now(), gpu=selected_gpu)
         write_json(status_path, record)
         print('POSTPROCESS COMPLETED', flush=True)

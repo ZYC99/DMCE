@@ -6,6 +6,7 @@ latency microbenchmark. Report other jobs/clock variability separately.
 """
 import argparse
 import gc
+import hashlib
 import json
 from pathlib import Path
 import platform
@@ -43,21 +44,28 @@ def main():
     results = {'python': platform.python_version(), 'torch': torch.__version__,
                'device': torch.cuda.get_device_name(device) if cuda else str(device), 'dtype': 'float32',
                'batch_size': args.batch_size, 'warmup': args.warmup, 'repeats': args.repeats,
-               'timing_scope': 'resident input to logits; includes channel and denoising, excludes I/O and loading', 'results': []}
+               'timing_scope': 'resident input to logits; includes channel and denoising, excludes I/O and loading',
+               'checkpoints': {}, 'results': []}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     for experiment in args.experiments:
-        payload = checkpoints.read(args.run_dir / experiment / 'stage3/best.pt')
+        checkpoint_path = args.run_dir / experiment / 'stage3/best.pt'
+        payload = checkpoints.read(checkpoint_path)
         config = payload['config']
         if payload.get('stage') != 'stage3' or payload.get('experiment') != experiment:
             raise ValueError('Wrong checkpoint stage or experiment')
         model = build_model(config).to(device)
         model.load_state_dict(payload['model'], strict=True)
         model.eval()
+        with checkpoint_path.open('rb') as stream:
+            digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+        results['checkpoints'][experiment] = {'sha256': digest, 'epoch': payload['epoch'],
+                                              'image_size': config['image_size']}
         del payload
         dataset = SegmentationDataset(args.data_dir, 'test', config['image_size'])
         if args.batch_size > len(dataset):
             raise ValueError('Batch size exceeds test set')
         images = torch.stack([dataset[i][0] for i in range(args.batch_size)]).to(device)
+        results['checkpoints'][experiment]['sample_ids'] = dataset.names[:args.batch_size]
         calls = [0]
 
         def count_call(*_):

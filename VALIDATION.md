@@ -56,6 +56,10 @@ verified against the hash prefix in the official checkpoint filename.
   collection, JSON/CSV and PNG/PDF plots, fixed day/night qualitative exports, and
   latency/UNet-call reporting. The collector correctly labels this as a custom or
   bounded run, not the full MFNet protocol.
+- **Publication-report checks**, passing: English/Chinese tables are generated from
+  the measured artifacts; default reporting rejects bounded output and mismatched
+  latency checkpoint hashes. Qualitative grids were visually checked for readable
+  captions and class legends. These previews remain bounded validation output.
 
 上述检查分别覆盖 10 项回归、16 个合成数据集成子进程、12 个真实数据短测子进程、冻结状态逐张量核对、26 个调度任务，以及结果汇总、定性图和耗时统计。全部通过。短测只验证运行链路，不作为论文精度或速度结论。
 

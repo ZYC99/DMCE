@@ -124,7 +124,7 @@ python scripts/run_suite.py \
 
 中断后使用相同路径、配置并添加 `--resume`。调度器检查原子保存的 checkpoint，决定哪些阶段需要继续训练；不要为同一输出目录启动第二个控制进程。
 
-也可同时启动结果整理进程，让它等待训练完成后核对权重、生成图表，并在空闲 GPU 上测量推理速度。共享服务器应为它指定与训练相同的 GPU 锁模板：
+也可同时启动结果整理进程，让它等待训练完成后核对权重、生成图表、在空闲 GPU 上测量推理速度，并生成中英文结果报告。报告会核对指标、定性图和耗时测试使用同一组权重。共享服务器应为它指定与训练相同的 GPU 锁模板：
 
 ```bash
 python scripts/finish_suite.py --suite-dir runs/paper_seed42 \
@@ -154,9 +154,14 @@ python scripts/export_qualitative.py --run-dir runs/paper_seed42/runs \
 python scripts/benchmark_inference.py --run-dir runs/paper_seed42/runs \
   --data-dir datasets/ir_seg_dataset --output results/paper_seed42/latency.json \
   --device cuda:0 --batch-size 1 --warmup 2 --repeats 10
+
+# 根据实测数据和权重哈希生成中英文结果报告
+python scripts/write_results_summary.py --results-dir results/paper_seed42
 ```
 
 主指标 `miou` 使用固定九类分母，完全缺失的类别记 0；`miou_foreground` 另外报告八个前景类。两者都使用完整混淆矩阵，保留背景像素上的误检。JSON/CSV 数值为 [0,1] 内的比例，图中显示百分比。CSI NMSE 使用总误差功率除以总真实信道功率，再转为 dB。每个 SNR 评测开始时重置随机种子。
+
+完整测试集、昼间与夜间分别执行评测，因此信道抽样和 batch 平均噪声功率可能不同，不能把昼夜混淆矩阵相加来还原完整测试矩阵。结果报告默认拒绝短测或自定义小规模实验；`--allow-bounded` 仅用于调试，会在两种语言的报告中醒目标明短测属性。
 
 耗时不包含数据读取与权重加载，包含编码器、信道、降噪器和解码器。必须同时报告 batch size 与 UNet 调用次数：逆扩散起点依赖 SNR，`T=1000` 不表示每个 SNR 都执行 1,000 次网络计算。
 
