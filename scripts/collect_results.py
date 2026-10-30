@@ -5,13 +5,36 @@ Absolute data/checkpoint paths and host details are omitted from public artifact
 The paper's reported numbers are never substituted for measured results.
 """
 import argparse
+import ast
 import csv
+import datetime
 import hashlib
+import importlib.metadata
 import json
 from pathlib import Path
+import platform
+import subprocess
 
 METHODS = {'dmce': 'DMCE (CSI)', 'without_dmce': 'Without DMCE', 'y_denoising': 'Y-oriented',
            'x_denoising': 'X-oriented (extension)', 'mfnet_channel': 'MFNet with channel'}
+
+
+def environment():
+    import torch
+    value = {'collected_at_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+             'python': platform.python_version(), 'system': platform.system(),
+             'libraries': {name: importlib.metadata.version(name) for name in ('torch', 'torchvision', 'numpy', 'Pillow', 'matplotlib')},
+             'cuda': torch.version.cuda, 'cudnn': torch.backends.cudnn.version(),
+             'default_dtype': str(torch.get_default_dtype()), 'amp_used': False,
+             'cudnn_benchmark': torch.backends.cudnn.benchmark,
+             'deterministic_algorithms': torch.are_deterministic_algorithms_enabled()}
+    try:
+        result = subprocess.run(['nvidia-smi', '--query-gpu=name', '--format=csv,noheader'],
+                                check=True, text=True, capture_output=True)
+        value['gpu_models'] = sorted(set(result.stdout.splitlines()))
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        value['gpu_models'] = []
+    return value
 
 
 def checkpoint_hash(path):
@@ -83,6 +106,11 @@ def main():
                                 'best_epoch': best['epoch'], 'best_validation_metric': best['best'],
                                 'best_checkpoint_sha256': checkpoint_hash(best_path),
                                 'config': public_config, 'history': list(history.values())}
+        execution = state['results'][job['name']]
+        if 'started_at' in execution and 'finished_at' in execution:
+            training[job['name']]['process_wall_seconds'] = (
+                datetime.datetime.fromisoformat(execution['finished_at']) -
+                datetime.datetime.fromisoformat(execution['started_at'])).total_seconds()
         del best
         arguments = json.loads((stage_path / 'config.json').read_text())['arguments']
         full_protocol &= configured_epochs == 100 and arguments['max_batches'] is None
@@ -104,11 +132,20 @@ def main():
             rows.extend(dict(experiment=experiment, split=split, **value) for value in values)
     nmse = json.loads((suite / 'runs/dmce/evaluation/csi_nmse.json').read_text())['results']
     full_protocol &= [value['snr_db'] for value in nmse] == list(range(0, 21, 2))
+    source_hashes = json.loads((suite / 'source_sha256.json').read_text())
+    # Only research code and protocol configurations belong in the public record;
+    # machine-specific configuration filenames are not needed for reproduction.
+    source_hashes = {name: digest for name, digest in source_hashes.items()
+                     if name.startswith(('dmce/', 'experiments/')) or name in {f'configs/{key}.json' for key in ('base', *METHODS)}}
+    current = Path(__file__).resolve().parents[1] / 'dmce'
+    ast_matches = {path.name: ast.dump(ast.parse(path.read_text())) == ast.dump(ast.parse((current / path.name).read_text()))
+                   for path in (suite / 'source/dmce').glob('*.py')}
     report = {'protocol': 'full_mfnet_100_epochs' if full_protocol else 'custom_or_bounded_run',
               'scope': 'refactored legacy implementation; not an exact numerical reproduction of the paper',
               'training': training, 'segmentation': measurements, 'csi_nmse': nmse,
               'freeze_audit': audit_freezing(suite / 'runs'),
-              'source_sha256': json.loads((suite / 'source_sha256.json').read_text())}
+              'environment': environment(), 'training_modules_match_current_ast': ast_matches,
+              'source_sha256': source_hashes}
     (output / 'results.json').write_text(json.dumps(report, indent=2) + '\n')
     with (output / 'segmentation.csv').open('w') as stream:
         writer = csv.DictWriter(stream, fieldnames=['experiment', 'split', 'snr_db', 'samples', 'miou',
