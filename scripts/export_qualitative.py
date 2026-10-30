@@ -62,15 +62,21 @@ def main():
     parser.add_argument('--output-dir', type=Path, required=True)
     parser.add_argument('--device', default='auto')
     parser.add_argument('--snr', type=float, default=4)
-    parser.add_argument('--samples-per-split', type=int, default=2)
+    parser.add_argument('--day-samples', type=int, default=3, help='First N official day examples (Fig. 5: 3)')
+    parser.add_argument('--night-samples', type=int, default=2, help='First N official night examples (Fig. 5: 2)')
+    parser.add_argument('--samples-per-split', type=int, help='Override both counts with the same N for custom exports')
     parser.add_argument('--experiments', nargs='+', choices=EXPERIMENTS, default=list(EXPERIMENTS))
     args = parser.parse_args()
-    if args.samples_per_split < 1:
-        parser.error('--samples-per-split must be positive')
+    if args.samples_per_split is not None:
+        args.day_samples = args.night_samples = args.samples_per_split
+    if min(args.day_samples, args.night_samples) < 1:
+        parser.error('Sample counts must be positive')
+    counts = {'test_day': args.day_samples, 'test_night': args.night_samples}
     args.output_dir.mkdir(parents=True, exist_ok=True)
     device = device_for(args.device)
     records, panels = {}, {}
     expected_samples = None
+    expected_by_split = None
     for experiment in args.experiments:
         path = args.run_dir / experiment / 'stage3/best.pt'
         payload = checkpoints.read(path)
@@ -86,11 +92,13 @@ def main():
                                'checkpoint_sha256': digest}
         del payload
         samples = []
+        samples_by_split = {'test_day': [], 'test_night': []}
         for split in ('test_day', 'test_night'):
             dataset = SegmentationDataset(args.data_dir, split, config['image_size'])
-            for index in range(min(args.samples_per_split, len(dataset))):
+            for index in range(min(counts[split], len(dataset))):
                 tensor, label, name = dataset[index]
                 samples.append(name)
+                samples_by_split[split].append(name)
                 # Same channel/noise seed across ResNet methods for the same sample.
                 seed_all(config['seed'] + index + (10000 if split == 'test_night' else 0))
                 with torch.inference_mode():
@@ -109,7 +117,8 @@ def main():
                 panels[name].append((experiment, coloured))
         if expected_samples is None:
             expected_samples = samples
-        elif samples != expected_samples:
+            expected_by_split = samples_by_split
+        elif samples != expected_samples or samples_by_split != expected_by_split:
             raise ValueError('Experiments used inconsistent sample lists')
         del model
         gc.collect()
@@ -118,7 +127,8 @@ def main():
     for name, columns in panels.items():
         comparison_grid(name, columns, args.snr).save(args.output_dir / f'{name}_comparison.png')
     metadata = {'snr_db': args.snr, 'selection': 'first N entries of official test_day/test_night, without cherry-picking',
-                'samples': expected_samples, 'experiments': records, 'classes': CLASSES, 'palette': PALETTE.tolist(),
+                'samples': expected_samples, 'samples_by_split': expected_by_split,
+                'experiments': records, 'classes': CLASSES, 'palette': PALETTE.tolist(),
                 'display': 'four-column grid, 320px panels; nearest-neighbor label display; native predictions saved separately'}
     (args.output_dir / 'manifest.json').write_text(json.dumps(metadata, indent=2) + '\n')
     print(f'Exported {len(panels)} comparisons to {args.output_dir}')

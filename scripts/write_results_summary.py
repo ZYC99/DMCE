@@ -49,8 +49,11 @@ def read_and_check(directory, allow_bounded=False):
             raise ValueError('Incomplete latency repetitions')
         if not all(math.isfinite(value) and value > 0 for value in row['batch_ms']):
             raise ValueError('Invalid latency measurement')
-    if full and (qualitative['snr_db'] != 4 or len(qualitative['samples']) != 4):
-        raise ValueError('Full report needs two day and two night qualitative examples at 4 dB')
+    examples = qualitative.get('samples_by_split', {})
+    if full and (qualitative['snr_db'] != 4 or len(examples.get('test_day', [])) != 3
+                 or len(examples.get('test_night', [])) != 2 or len(set(qualitative['samples'])) != 5
+                 or examples['test_day'] + examples['test_night'] != qualitative['samples']):
+        raise ValueError('Full report needs three day and two night qualitative examples at 4 dB (Fig. 5)')
     for name in qualitative['samples']:
         if not (directory / 'qualitative' / f'{name}_comparison.png').is_file():
             raise FileNotFoundError(f'Missing qualitative comparison: {name}')

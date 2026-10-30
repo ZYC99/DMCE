@@ -6,7 +6,7 @@
 
 作者：Youcheng Zeng、Xinxin He、Xu Chen、Haonan Tong、Zhaohui Yang、Yijun Guo、Jianjun Hao。
 
-[论文](https://arxiv.org/abs/2401.16017) · [IEEE DOI](https://doi.org/10.1109/ICC51166.2024.10622730) · [引用信息](CITATION.cff)
+[论文](https://arxiv.org/abs/2401.16017) · [IEEE DOI](https://doi.org/10.1109/ICC51166.2024.10622730) · [引用信息](CITATION.cff) · [实测结果](results/paper_seed42_20261031/README.zh-CN.md)
 
 本版本由作者原有代码整理而来，将依赖手工注释切换的实验拆成独立入口和配置。每个入口可以独立运行，不导入旧项目目录；原工作目录另行保留。传统 JPEG / LDPC / 4-QAM / DeepLabv3 数字传输链路不在本仓库的复现范围内。
 
@@ -146,7 +146,7 @@ python experiments/dmce.py --stage nmse --device cuda:0 \
 # 完整实验结束后，导出可分享的 JSON/CSV 与 PNG/PDF 曲线
 python scripts/collect_results.py --suite-dir runs/paper_seed42 --output-dir results/paper_seed42
 
-# Fig. 5 对应任务：固定选取官方昼间和夜间列表各前两张，SNR=4 dB
+# Fig. 5 对应任务：固定选取官方列表前 3 张昼间、前 2 张夜间图像，SNR=4 dB
 python scripts/export_qualitative.py --run-dir runs/paper_seed42/runs \
   --data-dir datasets/ir_seg_dataset --output-dir results/paper_seed42/qualitative --device cuda:0
 
@@ -167,7 +167,23 @@ python scripts/write_results_summary.py --results-dir results/paper_seed42
 
 耗时不包含数据读取与权重加载，包含编码器、信道、降噪器和解码器。必须同时报告 batch size 与 UNet 调用次数：逆扩散起点依赖 SNR，`T=1000` 不表示每个 SNR 都执行 1,000 次网络计算。
 
-**当前执行状态：**完整 100 轮实验正在运行，全部训练与评测结束后再补入最终数值。此前的短测见 [VALIDATION.md](VALIDATION.md)，不作为论文精度结果。
+## 实测结果
+
+完整 MFNet 实验已于 2026-10-31（Asia/Shanghai）完成：10 个训练阶段各 100 轮，五种方法在完整测试集、昼间、夜间共完成 165 个分割测量点，并完成独立随机流的 CSI 测试。详见[中文结果报告](results/paper_seed42_20261031/README.zh-CN.md)与[英文结果报告](results/paper_seed42_20261031/README.md)，包含全部曲线、逐类指标、5 张定性对比图、耗时和原始 JSON/CSV。
+
+以下为 393 个测试场景的九类 mIoU（%）：
+
+| 方法 | 0 dB | 4 dB | 10 dB | 20 dB |
+| --- | --- | --- | --- | --- |
+| DMCE (CSI) | 42.92 | 46.18 | 47.52 | 47.94 |
+| Without DMCE | 17.35 | 34.90 | 47.15 | 48.25 |
+| Y-oriented | 16.88 | 36.88 | 47.19 | 48.14 |
+| X-oriented (extension) | 17.59 | 35.45 | 46.86 | 47.89 |
+| MFNet with channel | 25.70 | 34.52 | 36.90 | 37.29 |
+
+本次 0 dB 下 DMCE 相对 Without-DMCE 高 **25.57 个百分点**；20 dB 下低 **0.30 个百分点**，优势主要体现在低 SNR。结果采用单种子 42，适用范围受下文的简化信道等实现差异限制。
+
+在 NVIDIA RTX PRO 5000 72GB Blackwell 上，FP32、batch size 1、4 dB 的全模型推理中位耗时为 DMCE **1041.57 ms**、Without-DMCE **8.22 ms**。每项预热 2 次、测量 10 次，不含数据读取与权重加载；这也是优先尝试跳步采样的依据。[验证记录](VALIDATION.md)包含完整性与权重来源核对。
 
 ## 默认配置及其来源
 

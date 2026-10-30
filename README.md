@@ -6,7 +6,7 @@ Research code for **DMCE: Diffusion Model Channel Enhancer for Multi-User Semant
 
 Youcheng Zeng, Xinxin He, Xu Chen, Haonan Tong, Zhaohui Yang, Yijun Guo, Jianjun Hao.
 
-[Paper](https://arxiv.org/abs/2401.16017) · [IEEE DOI](https://doi.org/10.1109/ICC51166.2024.10622730) · [Citation](CITATION.cff)
+[Paper](https://arxiv.org/abs/2401.16017) · [IEEE DOI](https://doi.org/10.1109/ICC51166.2024.10622730) · [Citation](CITATION.cff) · [Measured results](results/paper_seed42_20261031/README.md)
 
 This release reorganizes the author's existing research code into independent, configurable experiments. Each entry point runs without importing the old project. The original working directories were preserved separately. Traditional JPEG/LDPC/4-QAM/DeepLabv3 transmission is outside this release's scope.
 
@@ -146,7 +146,7 @@ python experiments/dmce.py --stage nmse --device cuda:0 \
 # After the complete suite, create portable JSON/CSV and PNG/PDF plots
 python scripts/collect_results.py --suite-dir runs/paper_seed42 --output-dir results/paper_seed42
 
-# Fig. 5 task: first two official day and night examples, fixed selection, 4 dB
+# Fig. 5 task: first three day and two night examples, fixed selection, 4 dB
 python scripts/export_qualitative.py --run-dir runs/paper_seed42/runs \
   --data-dir datasets/ir_seg_dataset --output-dir results/paper_seed42/qualitative --device cuda:0
 
@@ -167,7 +167,23 @@ All/day/night are evaluated in separate passes, so their channel draws and batch
 
 Latency excludes data loading and checkpoint loading and includes the encoder, channel, denoiser, and decoder. Report batch size and UNet evaluations alongside time: the SNR-dependent start index means `T=1000` does not imply 1,000 model calls at every SNR.
 
-**Current execution status:** the full 100-epoch suite is running. Final numerical results will be added after all training and evaluation jobs finish. The earlier short tests are described in [VALIDATION.md](VALIDATION.md) and are not paper-level accuracy results.
+## Measured results
+
+The full MFNet run completed on 2026-10-31 (Asia/Shanghai): 10 training stages of 100 epochs each, 165 segmentation measurements across five methods and all/day/night splits, and independently seeded CSI testing. The [English report](results/paper_seed42_20261031/README.md) and [Chinese report](results/paper_seed42_20261031/README.zh-CN.md) include all curves, per-class metrics, five qualitative comparisons, inference timings, and raw JSON/CSV.
+
+Nine-class mIoU (%) on all 393 test scenes:
+
+| Method | 0 dB | 4 dB | 10 dB | 20 dB |
+| --- | --- | --- | --- | --- |
+| DMCE (CSI) | 42.92 | 46.18 | 47.52 | 47.94 |
+| Without DMCE | 17.35 | 34.90 | 47.15 | 48.25 |
+| Y-oriented | 16.88 | 36.88 | 47.19 | 48.14 |
+| X-oriented (extension) | 17.59 | 35.45 | 46.86 | 47.89 |
+| MFNet with channel | 25.70 | 34.52 | 36.90 | 37.29 |
+
+At 0 dB, DMCE exceeds Without-DMCE by **25.57 percentage points**; at 20 dB it is **0.30 points lower**. The benefit is concentrated at low SNR. This is one training seed (42), subject to the simplified-channel and implementation differences below.
+
+On an NVIDIA RTX PRO 5000 72GB Blackwell, FP32 batch-size-1 full-model inference at 4 dB measured **1041.57 ms** median for DMCE and **8.22 ms** for Without-DMCE. Each measurement used two warmups and ten timed repetitions, excluding data and checkpoint loading; this motivates prioritizing timestep skipping. See the [validation record](VALIDATION.md) for completeness and checkpoint provenance checks.
 
 ## Defaults and configuration
 

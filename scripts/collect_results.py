@@ -166,13 +166,13 @@ def main():
               'environment': environment(), 'training_modules_match_current_ast': ast_matches,
               'source_sha256': source_hashes}
     (output / 'results.json').write_text(json.dumps(report, indent=2) + '\n')
-    with (output / 'segmentation.csv').open('w') as stream:
+    with (output / 'segmentation.csv').open('w', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=['experiment', 'split', 'snr_db', 'samples', 'miou',
-                                                    'miou_foreground', 'pixel_accuracy', 'loss'], extrasaction='ignore')
+                                                    'miou_foreground', 'pixel_accuracy', 'loss'], extrasaction='ignore', lineterminator='\n')
         writer.writeheader()
         writer.writerows(rows)
-    with (output / 'csi_nmse.csv').open('w') as stream:
-        writer = csv.DictWriter(stream, fieldnames=list(nmse[0]))
+    with (output / 'csi_nmse.csv').open('w', newline='') as stream:
+        writer = csv.DictWriter(stream, fieldnames=list(nmse[0]), lineterminator='\n')
         writer.writeheader()
         writer.writerows(nmse)
     import matplotlib

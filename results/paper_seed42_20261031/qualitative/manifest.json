@@ -1,0 +1,108 @@
+{
+  "snr_db": 4,
+  "selection": "first N entries of official test_day/test_night, without cherry-picking",
+  "samples": [
+    "01402D",
+    "01403D",
+    "01404D",
+    "01189N",
+    "01190N"
+  ],
+  "samples_by_split": {
+    "test_day": [
+      "01402D",
+      "01403D",
+      "01404D"
+    ],
+    "test_night": [
+      "01189N",
+      "01190N"
+    ]
+  },
+  "experiments": {
+    "dmce": {
+      "epoch": 18,
+      "best_validation_miou": 0.5334078005240914,
+      "checkpoint_sha256": "eedc6752c49457cca11d26d4772bfa48f2c085a261b30581763963d7c42dd3c4"
+    },
+    "without_dmce": {
+      "epoch": 8,
+      "best_validation_miou": 0.5318737326080835,
+      "checkpoint_sha256": "e3217b0a37cb149ed87d433b932818f956c0103886a950cca96df01860ff6a71"
+    },
+    "y_denoising": {
+      "epoch": 32,
+      "best_validation_miou": 0.5303269260451658,
+      "checkpoint_sha256": "38ee2c9e59ada3850e70364b4b1f3cf0df4dfd6e3d38df614e4d61445e6563a2"
+    },
+    "x_denoising": {
+      "epoch": 18,
+      "best_validation_miou": 0.5323587879139892,
+      "checkpoint_sha256": "19c45c0d32b7ed0a490fcf063312ddc8f8809e6ea6660213cf7d6d54ebd574fb"
+    },
+    "mfnet_channel": {
+      "epoch": 93,
+      "best_validation_miou": 0.3845744113020847,
+      "checkpoint_sha256": "9748ba00bbed08e46165880feeca7004d428d9d69582da479aacc0fac441121c"
+    }
+  },
+  "classes": [
+    "unlabelled",
+    "car",
+    "person",
+    "bike",
+    "curve",
+    "car stop",
+    "guardrail",
+    "color cone",
+    "bump"
+  ],
+  "palette": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      64,
+      0,
+      128
+    ],
+    [
+      64,
+      64,
+      0
+    ],
+    [
+      0,
+      128,
+      192
+    ],
+    [
+      0,
+      0,
+      192
+    ],
+    [
+      128,
+      128,
+      0
+    ],
+    [
+      64,
+      64,
+      128
+    ],
+    [
+      192,
+      128,
+      128
+    ],
+    [
+      192,
+      64,
+      0
+    ]
+  ],
+  "display": "four-column grid, 320px panels; nearest-neighbor label display; native predictions saved separately"
+}
