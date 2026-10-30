@@ -1,0 +1,1 @@
+{"experiment": "y_denoising", "backbone": "resnet50", "target": "y"}

@@ -1,0 +1,1 @@
+{"experiment": "mfnet_channel", "backbone": "mfnet", "target": "none", "pretrained": false}

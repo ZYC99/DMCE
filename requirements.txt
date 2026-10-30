@@ -1,0 +1,6 @@
+# Reuse a working CUDA-compatible torch/torchvision pair on GPU servers.
+# These lower bounds also allow the tested macOS CPU pair 2.5.1 / 0.20.1.
+torch>=2.5
+torchvision>=0.20
+numpy>=1.26
+Pillow>=10

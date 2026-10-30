@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this research code, please cite the ICC 2024 DMCE paper below."
+title: "DMCE: Refactored Research Code for the ICC 2024 Paper"
+authors:
+  - name: "DMCE contributors"
+repository-code: "https://github.com/ZYC99/DMCE"
+preferred-citation:
+  type: conference-paper
+  title: "DMCE: Diffusion Model Channel Enhancer for Multi-User Semantic Communication Systems"
+  authors:
+    - family-names: Zeng
+      given-names: Youcheng
+    - family-names: He
+      given-names: Xinxin
+    - family-names: Chen
+      given-names: Xu
+    - family-names: Tong
+      given-names: Haonan
+    - family-names: Yang
+      given-names: Zhaohui
+    - family-names: Guo
+      given-names: Yijun
+    - family-names: Hao
+      given-names: Jianjun
+  collection-title: "ICC 2024 - IEEE International Conference on Communications"
+  year: 2024
+  start: 855
+  end: 860
+  doi: "10.1109/ICC51166.2024.10622730"
+  url: "https://arxiv.org/abs/2401.16017"

@@ -1,0 +1,16 @@
+{
+  "experiment": "", "backbone": "resnet50", "target": "none",
+  "data_dir": "datasets/ir_seg_dataset", "output_dir": "runs", "device": "auto",
+  "seed": 42, "classes": 9, "image_size": [480, 640], "pretrained": true,
+  "batch_size": 8, "workers": 4, "train_snr": 20,
+  "snrs": [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+  "channel": {"distance_min": 10.0, "distance_max": 500.0, "subcarrier_spacing": 15000.0},
+  "diffusion": {
+    "steps": 1000, "beta_start": 0.0001, "beta_end": 0.02, "side": 70,
+    "inner_channels": 32, "norm_groups": 32, "channel_mults": [1, 2, 4, 8, 8],
+    "attention_resolutions": [16], "res_blocks": 3
+  },
+  "stage1": {"epochs": 100, "lr": 0.01, "lr_decay": 0.95, "momentum": 0.9, "weight_decay": 0.0005},
+  "stage2": {"epochs": 100, "lr": 0.0001, "batch_size": 64, "samples": 20000, "validation_samples": 1000},
+  "stage3": {"epochs": 100, "lr": 0.01, "lr_decay": 0.95, "momentum": 0.9, "weight_decay": 0.0005}
+}
