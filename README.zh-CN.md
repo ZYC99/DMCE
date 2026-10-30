@@ -141,7 +141,7 @@ python experiments/dmce.py --stage eval --device cuda:0 \
 
 # Fig. 4 对应任务：初始 CSI 与增强后 CSI 的 NMSE
 python experiments/dmce.py --stage nmse --device cuda:0 \
-  --checkpoint runs/dmce/stage2/best.pt
+  --checkpoint runs/dmce/stage2/best.pt --seed 200042
 
 # 完整实验结束后，导出可分享的 JSON/CSV 与 PNG/PDF 曲线
 python scripts/collect_results.py --suite-dir runs/paper_seed42 --output-dir results/paper_seed42
@@ -160,6 +160,8 @@ python scripts/write_results_summary.py --results-dir results/paper_seed42
 ```
 
 主指标 `miou` 使用固定九类分母，完全缺失的类别记 0；`miou_foreground` 另外报告八个前景类。两者都使用完整混淆矩阵，保留背景像素上的误检。JSON/CSV 数值为 [0,1] 内的比例，图中显示百分比。CSI NMSE 使用总误差功率除以总真实信道功率，再转为 dB。每个 SNR 评测开始时重置随机种子。
+
+合成 CSI 测试使用独立随机流：训练种子为 42，Stage 2 验证为 100042，NMSE 测试为 200042。完整调度器按训练种子计算这些偏移；直接调用 `--stage nmse` 时，需要像上例一样显式指定独立测试种子。报告核对 CSI 权重哈希，并记录测试种子和样本数。修正旧实验时保留原输出，通过 `collect_results.py` 或 `finish_suite.py` 的 `--nmse-results <独立评测.json>` 指定重测结果。旧实验的任务计划若尚未区分随机流，请使用其保存的 `source/scripts/run_suite.py` 续跑。
 
 完整测试集、昼间与夜间分别执行评测，因此信道抽样和 batch 平均噪声功率可能不同，不能把昼夜混淆矩阵相加来还原完整测试矩阵。结果报告默认拒绝短测或自定义小规模实验；`--allow-bounded` 仅用于调试，会在两种语言的报告中醒目标明短测属性。
 
@@ -184,7 +186,7 @@ H 训练同时使用实部与虚部，共享单通道 UNet；Y/HX 使用双通�
 
 ## 修复内容与论文差异
 
-1. 原实现是两路实数特征共用的逐元素衰落信道，填充为 70×70 网格，没有完整实现式 (4) 的 MIMO 混合、阵列响应及多用户检测。三条合成路径仍共享时延。距离改用浮点数以避免 int8 溢出；每个样本单独抽取 H，不再整个 batch 共用一次随机 H。噪声功率仍根据 batch 平均接收功率计算。
+1. 原实现是两路实数特征共用的逐元素衰落信道，填充为 70×70 网格，没有完整实现式 (4) 的 MIMO 混合、阵列响应及多用户检测。三条合成路径仍共享时延，因此响应实际化简为一个随机标量幅度的单一复指数，合成 CSI 的结构很强。距离改用浮点数以避免 int8 溢出；每个样本单独抽取 H，不再整个 batch 共用一次随机 H。噪声功率仍根据 batch 平均接收功率计算。
 2. 修复 IR 分支误用 RGB 接收特征；MFNet 所有尺度及跳接均实际使用过信道后的特征。MFNet 与 ResNet 传输的特征数量不同，本对比没有统一信道使用次数预算。
 3. 功率按样本归一化，并保护零范数。统一复高斯噪声为 E|Z|²=σ²，实部与虚部分别为 σ²/2，CSI 噪声同样遵守该约定。扩散日程补齐 ᾱ₀=1，统一 t/T 条件，正确缩放起始观测，并处理零噪声边界。
 4. 原代码的确定性逆更新在代数上属于 η=0 的 DDIM 式相邻时间步更新，训练目标为 DDPM 噪声预测。它不是带随机后验采样的 ancestral DDPM，也尚未跳步。观测条件通过逆扩散起点进入，没有独立的观测或导频条件编码器。

@@ -75,6 +75,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--suite-dir', type=Path, required=True)
     parser.add_argument('--output-dir', type=Path, required=True)
+    parser.add_argument('--nmse-results', type=Path,
+                        help='Explicit independently seeded CSI evaluation JSON; original suite outputs stay unchanged')
     args = parser.parse_args()
     suite, output = args.suite_dir, args.output_dir
     state = json.loads((suite / 'status.json').read_text())
@@ -130,7 +132,23 @@ def main():
             full_protocol &= [value['snr_db'] for value in values] == list(range(0, 21, 2))
             full_protocol &= all(value['samples'] == expected_count for value in values)
             rows.extend(dict(experiment=experiment, split=split, **value) for value in values)
-    nmse = json.loads((suite / 'runs/dmce/evaluation/csi_nmse.json').read_text())['results']
+    nmse_path = args.nmse_results or suite / 'runs/dmce/evaluation/csi_nmse.json'
+    nmse_payload = json.loads(nmse_path.read_text())
+    nmse = nmse_payload['results']
+    nmse_config = nmse_payload['config']
+    training_seed = training['dmce_stage2']['config']['seed']
+    nmse_hash = checkpoint_hash(Path(nmse_payload['checkpoint']))
+    if nmse_hash != training['dmce_stage2']['best_checkpoint_sha256']:
+        raise ValueError('CSI NMSE checkpoint differs from the trained Stage 2 best checkpoint')
+    independent_seed = nmse_config['seed'] not in (training_seed, training_seed + 100000)
+    if full_protocol and not independent_seed:
+        raise ValueError('CSI evaluation reuses a training/validation seed; rerun with an independent --seed and pass --nmse-results')
+    nmse_protocol = {'training_seed': training_seed, 'validation_seed': training_seed + 100000,
+                     'test_seed': nmse_config['seed'], 'independent_test_seed': independent_seed,
+                     'samples_per_snr': nmse_config['stage2']['validation_samples'],
+                     'batch_size': nmse_config['stage2']['batch_size'], 'checkpoint_sha256': nmse_hash,
+                     'separate_evaluation_supplied': args.nmse_results is not None}
+    full_protocol &= nmse_protocol['samples_per_snr'] == 1000
     full_protocol &= [value['snr_db'] for value in nmse] == list(range(0, 21, 2))
     source_hashes = json.loads((suite / 'source_sha256.json').read_text())
     # Only research code and protocol configurations belong in the public record;
@@ -143,6 +161,7 @@ def main():
     report = {'protocol': 'full_mfnet_100_epochs' if full_protocol else 'custom_or_bounded_run',
               'scope': 'refactored legacy implementation; not an exact numerical reproduction of the paper',
               'training': training, 'segmentation': measurements, 'csi_nmse': nmse,
+              'csi_nmse_protocol': nmse_protocol,
               'freeze_audit': audit_freezing(suite / 'runs'),
               'environment': environment(), 'training_modules_match_current_ast': ast_matches,
               'source_sha256': source_hashes}

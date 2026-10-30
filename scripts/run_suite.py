@@ -30,7 +30,7 @@ def write_json(path, value):
     temporary.replace(path)
 
 
-def make_jobs(source, output, data, config):
+def make_jobs(source, output, data, config, nmse_seed):
     common = ['--config', str(config), '--data-dir', str(data), '--output-dir', str(output / 'runs'), '--device', 'cuda:0']
     jobs = []
     shared = output / 'runs/without_dmce/stage1/best.pt'
@@ -52,7 +52,7 @@ def make_jobs(source, output, data, config):
         add(f'{experiment}_stage3', experiment, 'stage3', dependencies, extra)
         for split in ('test', 'test_day', 'test_night'):
             add(f'{experiment}_{split}', experiment, 'eval', [f'{experiment}_stage3'], ['--split', split])
-    add('dmce_nmse', 'dmce', 'nmse', ['dmce_stage2'])
+    add('dmce_nmse', 'dmce', 'nmse', ['dmce_stage2'], ['--seed', nmse_seed])
     return jobs
 
 
@@ -93,8 +93,11 @@ def main():
         parser.error('--gpu-lock-template must contain {gpu}')
     output, data = args.output_dir.resolve(), args.data_dir.resolve()
     source, config_path = output / 'source', output / 'override.json'
-    jobs = make_jobs(source, output, data, config_path)
     override = json.loads(args.config.read_text()) if args.config else {}
+    training_seed = override.get('seed', json.loads((ROOT / 'configs/base.json').read_text())['seed'])
+    # Stage 2 validation uses seed + 100000; synthetic test channels need a
+    # separate stream too. Reusing the training seed repeats its first batch.
+    jobs = make_jobs(source, output, data, config_path, nmse_seed=training_seed + 200000)
     if args.dry_run:
         print(json.dumps({'override': override, 'jobs': jobs}, indent=2))
         return

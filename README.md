@@ -141,7 +141,7 @@ python experiments/dmce.py --stage eval --device cuda:0 \
 
 # Fig. 4 task: initial and enhanced CSI NMSE
 python experiments/dmce.py --stage nmse --device cuda:0 \
-  --checkpoint runs/dmce/stage2/best.pt
+  --checkpoint runs/dmce/stage2/best.pt --seed 200042
 
 # After the complete suite, create portable JSON/CSV and PNG/PDF plots
 python scripts/collect_results.py --suite-dir runs/paper_seed42 --output-dir results/paper_seed42
@@ -160,6 +160,8 @@ python scripts/write_results_summary.py --results-dir results/paper_seed42
 ```
 
 The main `miou` averages all nine classes with a fixed denominator; absent classes contribute zero. `miou_foreground` reports the eight foreground classes separately. Both use the full confusion matrix, including false positives on background. JSON/CSV values are fractions in [0,1]; plots show percentages. CSI NMSE is total squared error divided by total true channel power, then converted to dB. The evaluation seed resets at each SNR.
+
+Synthetic CSI testing uses an independent random stream: training seed 42, Stage 2 validation seed 100042, and NMSE test seed 200042. The suite derives these offsets from the configured training seed. For a direct `--stage nmse` call, pass the independent test seed explicitly as above. The report checks the CSI checkpoint hash and records the test seed and sample count. If correcting an older run, keep its files and use `--nmse-results <independent-evaluation.json>` with `collect_results.py` or `finish_suite.py`. Resume an older suite with its saved `source/scripts/run_suite.py` if its job plan predates this seed separation.
 
 All/day/night are evaluated in separate passes, so their channel draws and batch-average noise power can differ. The day/night confusion matrices should not be summed to reconstruct the all-test matrix. Result reporting rejects short/custom runs by default; `--allow-bounded` is for debugging and labels both reports prominently.
 
@@ -184,7 +186,7 @@ H training includes both real and imaginary components with a shared one-channel
 
 ## Implementation differences
 
-1. The inherited channel is shared elementwise fading for two real feature streams, padded onto a 70×70 grid. It omits full MIMO mixing, array responses, and multi-user detection in Eq. (4). The three synthetic paths retain a shared delay. Distances now use floating point to avoid int8 overflow; H is sampled per example instead of once for the entire batch. Noise power still follows batch-average received power.
+1. The inherited channel is shared elementwise fading for two real feature streams, padded onto a 70×70 grid. It omits full MIMO mixing, array responses, and multi-user detection in Eq. (4). The three synthetic paths retain a shared delay, so their response reduces to one complex exponential with a random scalar amplitude. This makes the synthetic CSI especially structured. Distances now use floating point to avoid int8 overflow; H is sampled per example instead of once for the entire batch. Noise power still follows batch-average received power.
 2. The IR branch no longer accidentally reuses RGB received features. All MFNet scales now use the transmitted noisy features, including previously bypassed skip connections. MFNet and ResNet transmit different feature payloads, so this comparison does not enforce equal channel-use budgets.
 3. Power normalization is per sample and protects zero norms. Complex Gaussian noise satisfies E|Z|²=σ², with σ²/2 per component, including CSI noise. The diffusion schedule includes ᾱ₀=1, uses consistent t/T conditioning, scales the starting observation correctly, and handles zero-noise starts.
 4. The inherited deterministic reverse update is algebraically an η=0 DDIM-style adjacent-step update, trained with the DDPM noise objective. It is not an ancestral stochastic DDPM sampler, and it has no timestep skipping. Observation conditioning enters through the starting point; there is no separate observation/pilot conditioning encoder.

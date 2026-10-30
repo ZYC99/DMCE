@@ -29,6 +29,11 @@ def read_and_check(directory, allow_bounded=False):
         raise ValueError('Refusing to publish a bounded/custom run as full results; use --allow-bounded for debugging only')
     if not report['training_modules_match_current_ast'] or not all(report['training_modules_match_current_ast'].values()):
         raise ValueError('Training module logic differs from the source snapshot')
+    nmse_protocol = report.get('csi_nmse_protocol', {})
+    if full and (not nmse_protocol.get('independent_test_seed') or nmse_protocol.get('samples_per_snr') != 1000):
+        raise ValueError('Full report needs independently seeded CSI test channels')
+    if nmse_protocol and nmse_protocol['checkpoint_sha256'] != report['training']['dmce_stage2']['best_checkpoint_sha256']:
+        raise ValueError('CSI NMSE checkpoint does not match Stage 2')
     for experiment in METHODS:
         expected = report['training'][f'{experiment}_stage3']['best_checkpoint_sha256']
         if qualitative['experiments'][experiment]['checkpoint_sha256'] != expected:
@@ -97,9 +102,24 @@ def render(report, latency, qualitative, full, chinese=False):
                   table([lang('Class', '类别'), *METHODS.values()],
                         [[name, *[f'{100 * all_test[method][4]["iou_per_class"][index]:.2f}' for method in METHODS]]
                          for index, name in enumerate(qualitative['classes'])])]
+    nmse_protocol = report.get('csi_nmse_protocol')
+    nmse_note = []
+    if nmse_protocol:
+        nmse_note = [lang(
+            f'CSI random streams: training seed **{nmse_protocol["training_seed"]}**, '
+            f'validation seed **{nmse_protocol["validation_seed"]}**, test seed **{nmse_protocol["test_seed"]}**; '
+            f'**{nmse_protocol["samples_per_snr"]}** synthetic test channels per SNR. '
+            'The CSI checkpoint hash is recorded in results.json.',
+            f'CSI 随机流：训练种子 **{nmse_protocol["training_seed"]}**，'
+            f'验证种子 **{nmse_protocol["validation_seed"]}**，测试种子 **{nmse_protocol["test_seed"]}**；'
+            f'每个 SNR 使用 **{nmse_protocol["samples_per_snr"]}** 个合成测试信道。CSI 权重哈希记录在 results.json 中。')]
     lines += [lang('## CSI NMSE', '## CSI NMSE'),
+              *nmse_note,
               lang('Total squared error / total channel power, expressed in dB. Lower is better.',
                    '总误差功率 / 总真实信道功率，转为 dB；越低越好。'),
+              lang('The shared-delay channel reduces to a single complex exponential with a random scalar amplitude. '
+                   'This strongly structured synthetic CSI result should not be extrapolated to full multi-user MIMO.',
+                   '共享时延的信道化简为一个随机标量幅度的单一复指数。合成 CSI 的结构很强，此处结果不能外推为完整多用户 MIMO 的性能。'),
               table(['SNR (dB)', lang('Initial CSI (dB)', '初始 CSI（dB）'), lang('Enhanced CSI (dB)', '增强 CSI（dB）')],
                     [[f'{row["snr_db"]:g}', f'{row["initial_nmse_db"]:.3f}', f'{row["enhanced_nmse_db"]:.3f}'] for row in report['csi_nmse']]),
               '![CSI NMSE](csi_nmse.png)',

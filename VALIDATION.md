@@ -114,3 +114,13 @@ commands, exit codes, and elapsed times to local JSON and logs. Private absolute
 paths and large debug checkpoints are excluded from the public Git repository.
 
 使用新的输出目录以保留先前记录。测试脚本将实际命令、退出码和耗时写入本地 JSON 与日志；含私有绝对路径的原始日志和大型调试权重不提交到公开 Git 仓库。
+
+## Synthetic CSI random-stream audit / 合成 CSI 随机流核对
+
+A CUDA probe confirmed that reusing training seed 42 in NMSE evaluation repeated the first 64 synthetic training channels. The suite now uses training seed + 200000 for CSI testing; diffusion validation uses +100000. Full reports reject reused train/validation seeds and verify the CSI checkpoint hash. The ongoing training remains unchanged; its NMSE evaluation is repeated separately with seed 200042, preserving the original output.
+
+CUDA 核对确认，NMSE 评测复用训练种子 42 会重复首批 64 个训练信道。调度器现改用训练种子 +200000 作为 CSI 测试种子，扩散验证使用 +100000。完整报告拒绝复用训练或验证种子，并核对 CSI 权重哈希。当前训练不变，另以种子 200042 重算 NMSE，保留原始输出。
+
+Four new regression checks passed: default/custom training seeds produce separate CSI test streams, reused seeds are rejected in full reports, and mismatched CSI checkpoint hashes are rejected. A bounded end-to-end run with test seed 200042 also generated both reports successfully.
+
+新增 4 项回归检查通过：默认与自定义训练种子均产生独立 CSI 测试流；完整报告拒绝复用种子；CSI 权重哈希不符时拒绝汇总。另以测试种子 200042 完成一次短测及中英文报告生成验证。

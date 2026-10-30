@@ -22,6 +22,7 @@ def main():
     parser.add_argument('--suite-dir', type=Path, required=True)
     parser.add_argument('--data-dir', type=Path, required=True)
     parser.add_argument('--output-dir', type=Path, required=True)
+    parser.add_argument('--nmse-results', type=Path, help='Optional separate CSI evaluation JSON passed to result collection')
     parser.add_argument('--gpus', type=int, nargs='+', required=True)
     parser.add_argument('--gpu-lock-template', default='/tmp/dmce-gpu{gpu}.lock')
     parser.add_argument('--wait', action='store_true')
@@ -77,7 +78,10 @@ def main():
             write_json(status_path, record)
             completed.check_returncode()
 
-        run('collect', [ROOT / 'scripts/collect_results.py', '--suite-dir', suite, '--output-dir', output])
+        collection = [ROOT / 'scripts/collect_results.py', '--suite-dir', suite, '--output-dir', output]
+        if args.nmse_results is not None:
+            collection += ['--nmse-results', args.nmse_results.resolve()]
+        run('collect', collection)
         record.update(status='waiting_gpu', updated_at=now())
         write_json(status_path, record)
         selected_gpu, lock = None, None
